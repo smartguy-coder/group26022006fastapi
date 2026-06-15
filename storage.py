@@ -40,6 +40,11 @@ class MongoDBStorage:
                 status_code=status.HTTP_404_NOT_FOUND
             )
 
+        book = self.transform_book(book)
+
+        return book
+
+    def transform_book(self, book: dict) -> BookSavedSchema:
         book = BookSavedSchema(
             title=book['title'],
             image=book['image'],
@@ -48,7 +53,34 @@ class MongoDBStorage:
             id=str(book['_id']),
             created_at=book['created_at'],
         )
-
         return book
+
+
+    def get_books(self, q: str = "", page: int = 1)-> list[BookSavedSchema]:
+        query = {}
+        if q:
+            query_words = q.split()
+            print(query_words)
+
+            # target_list = []
+            # for word in query_words:
+            #     if len(word) > 1:
+            #         target_list.append(word.lower())
+            query_words = [word.lower() for word in query_words if len(word) > 1]
+
+            if query_words:
+                query_words_dicts = [{'title': {"$regex": word, "$options": 'i'}} for word in query_words]
+                query = {
+                    "$and": query_words_dicts
+                }
+        skip = (page - 1) *  settings.PAGE_SIZE
+        books = self.collection.find(query).limit(settings.PAGE_SIZE).skip(skip)
+        saved_books = []
+        for book in books:
+            saved_books.append(self.transform_book(book))
+
+        return saved_books
+
+
 
 storage = MongoDBStorage()
